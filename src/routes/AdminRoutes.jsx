@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
+import ProtectedRoute from './ProtectedRoute';
 import AdminLayout from '../layouts/AdminLayout';
 import Dashboard from '../pages/admin/Dashboard';
 import Appointments from '../pages/admin/Appointments';
@@ -13,15 +14,15 @@ export default function AdminRoutes() {
     <Routes>
       {/* Standalone Login Route */}
       <Route path="login" element={<Login />} />
-      
-      {/* Pathless Layout Route - wraps all nested admin pages */}
-      <Route element={<AdminLayout />}>
+      <Route element={<ProtectedRoute requireAdmin />}>
+        <Route element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="appointments" element={<Appointments />} />
         <Route path="schedule" element={<ScheduleManagement />} />
         <Route path="services" element={<ServicesManagement />} />
         <Route path="jewelry" element={<JewelryManagement />} />
         <Route path="customers" element={<CustomerManagement />} />
+        </Route>
       </Route>
     </Routes>
   );

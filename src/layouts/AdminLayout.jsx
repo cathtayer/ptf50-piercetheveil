@@ -1,8 +1,18 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, CalendarDays, Clock, Scissors, Gem, Users, LogOut } from 'lucide-react';
+import { signOut } from '../features/authentication/authService';
 
 export default function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } finally {
+      navigate('/admin/login', { replace: true });
+    }
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -21,12 +31,12 @@ export default function AdminLayout() {
           <h1 className="text-3xl font-serif text-brand-cream tracking-wider">Pierce<br/><span className="italic text-brand-blood">the</span> Veil</h1>
           <p className="text-[10px] text-brand-muted mt-4 uppercase tracking-[0.3em]">Admin Portal</p>
         </div>
-        
+
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = item.path === '/admin' 
-              ? location.pathname === '/admin' 
+            const isActive = item.path === '/admin'
+              ? location.pathname === '/admin'
               : location.pathname.startsWith(item.path);
 
             return (
@@ -34,8 +44,8 @@ export default function AdminLayout() {
                 key={item.name}
                 to={item.path}
                 className={`flex items-center gap-4 px-4 py-3 transition-all duration-300 ${
-                  isActive 
-                    ? 'border-l-2 border-brand-blood text-brand-cream bg-brand-blood/5' 
+                  isActive
+                    ? 'border-l-2 border-brand-blood text-brand-cream bg-brand-blood/5'
                     : 'border-l-2 border-transparent text-brand-muted hover:text-brand-cream hover:border-brand-muted/30'
                 }`}
               >
@@ -47,7 +57,10 @@ export default function AdminLayout() {
         </nav>
 
         <div className="p-6 border-t border-brand-blood/30">
-          <button className="flex items-center gap-4 px-4 py-2 w-full text-brand-muted hover:text-brand-cream transition-colors text-sm uppercase tracking-wide font-light">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-4 px-4 py-2 w-full text-brand-muted hover:text-brand-cream transition-colors text-sm uppercase tracking-wide font-light"
+          >
             <LogOut size={18} strokeWidth={1.5} />
             Sign Out
           </button>
