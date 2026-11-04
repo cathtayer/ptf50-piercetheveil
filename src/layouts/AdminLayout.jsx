@@ -1,8 +1,10 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, Clock, Scissors, Gem, Users, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { LayoutDashboard, CalendarDays, Clock, Scissors, Gem, Users, LogOut, Menu, X } from 'lucide-react';
 
 export default function AdminLayout() {
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -15,8 +17,18 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen bg-brand-black text-brand-cream font-sans overflow-hidden">
-      {/* Dark Elegant Sidebar */}
-      <aside className="w-64 bg-brand-dark border-r border-brand-blood/30 flex flex-col z-20">
+      {isSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          className="fixed inset-0 z-20 bg-black/60 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`fixed inset-y-0 left-0 z-30 flex w-64 max-w-[85vw] flex-col border-r border-brand-blood/30 bg-brand-dark transition-transform duration-300 md:relative md:translate-x-0 ${
+        isSidebarOpen ? 'visible translate-x-0' : 'invisible -translate-x-full md:visible'
+      }`}>
         <div className="p-8 border-b border-brand-blood/30 text-center">
           <h1 className="text-3xl font-serif text-brand-cream tracking-wider">Pierce<br/><span className="italic text-brand-blood">the</span> Veil</h1>
           <p className="text-[10px] text-brand-muted mt-4 uppercase tracking-[0.3em]">Admin Portal</p>
@@ -33,6 +45,7 @@ export default function AdminLayout() {
               <Link
                 key={item.name}
                 to={item.path}
+                onClick={() => setIsSidebarOpen(false)}
                 className={`flex items-center gap-4 px-4 py-3 transition-all duration-300 ${
                   isActive 
                     ? 'border-l-2 border-brand-blood text-brand-cream bg-brand-blood/5' 
@@ -56,7 +69,19 @@ export default function AdminLayout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto bg-brand-black relative">
-        <div className="p-10 max-w-7xl mx-auto">
+        <header className="flex items-center gap-4 border-b border-brand-blood/30 bg-brand-dark px-4 py-3 md:hidden">
+          <button
+            type="button"
+            aria-label={isSidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isSidebarOpen}
+            className="text-brand-cream"
+            onClick={() => setIsSidebarOpen((open) => !open)}
+          >
+            {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          <span className="font-serif tracking-wide">Admin Portal</span>
+        </header>
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-10">
           <Outlet />
         </div>
       </main>
