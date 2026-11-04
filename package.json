@@ -4,11 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-ort.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-ort.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@supabase/supabase-js": "^2.118.0",
     "lucide-react": "^1.66.0",
     "react": "^18.3.1",
