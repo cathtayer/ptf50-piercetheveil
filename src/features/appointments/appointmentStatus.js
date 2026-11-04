@@ -9,7 +9,7 @@ export const STATUS_LABEL = {
 };
 
 export const STATUS_STYLE = {
-  PENDING: 'text-[#d4af37] border-[#d4af37]/30 bg-[#d4af37]/10',
+  PENDING: 'text-brand-gold border-brand-gold/30 bg-brand-gold/10',
   APPROVED: 'text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/10',
   COMPLETED: 'text-brand-muted border-brand-muted/30 bg-brand-muted/10',
   REJECTED: 'text-red-400 border-red-400/30 bg-red-400/10',

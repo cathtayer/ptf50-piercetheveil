@@ -109,7 +109,7 @@ export default function JewelryManagement() {
       </header>
 
       {error && <p role="alert" className="text-sm text-red-400 font-light">{error}</p>}
-      {notice && <p role="status" className="text-sm text-[#d4af37] font-light">{notice}</p>}
+      {notice && <p role="status" className="text-sm text-brand-gold font-light">{notice}</p>}
       {!loading && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-4 text-xs text-brand-muted">
           <span className="uppercase tracking-widest">AI index: {indexed} of {items.length} pieces ready</span>
@@ -143,7 +143,7 @@ export default function JewelryManagement() {
             </div>
             <div className="flex justify-between items-start mb-2 gap-3">
               <h3 className="text-brand-cream font-serif text-lg">{item.name}</h3>
-              <span className="text-[#d4af37] text-sm tracking-widest whitespace-nowrap">{peso(item.price)}</span>
+              <span className="text-brand-gold text-sm tracking-widest whitespace-nowrap">{peso(item.price)}</span>
             </div>
             <p className="text-brand-muted text-xs uppercase tracking-widest mb-1">
               {[item.style, item.material, item.color].filter(Boolean).join(' · ') || 'No attributes'}

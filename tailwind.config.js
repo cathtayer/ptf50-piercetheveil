@@ -13,11 +13,12 @@ export default {
           blood: '#5c0a0a', // Deep crimson accent
           cream: '#fdfbf7', // Off-white text
           muted: '#8c7b7b', // Secondary text
+          'brand-gold': '#d4af37',
         }
       },
       fontFamily: {
-        serif: ['"Playfair Display"', 'Georgia', 'serif'],
-        sans: ['"Inter"', 'system-ui', 'sans-serif'],
+        serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
       }
     },
   },
