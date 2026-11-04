@@ -1,18 +1,91 @@
-import { Filter, MoreVertical, Calendar } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Filter } from 'lucide-react';
+import {
+  adminUpdateAppointment,
+  getAvailableSlots,
+  listAllAppointments,
+} from '../../features/appointments/appointmentService';
+import { STATUS_LABEL, STATUS_OPTIONS, STATUS_STYLE } from '../../features/appointments/appointmentStatus';
+import { formatManila, toUserMessage } from '../../services/api';
+
+// Which buttons each status offers (mirrors the rules enforced in the database).
+const ACTIONS = {
+  PENDING: [['approve', 'Approve'], ['reject', 'Reject'], ['reschedule', 'Reschedule'], ['cancel', 'Cancel']],
+  APPROVED: [['complete', 'Complete'], ['no_show', 'No-show'], ['reschedule', 'Reschedule'], ['cancel', 'Cancel']],
+};
+const CONFIRM = {
+  reject: 'Reject this request?',
+  cancel: 'Cancel this appointment?',
+  no_show: 'Mark this appointment as a no-show?',
+};
 
 export default function Appointments() {
-  const appointments = [
-    { id: '1', client: 'Jane Doe', service: 'Helix Piercing', date: 'Nov 04, 2026', status: 'Approved' },
-    { id: '2', client: 'Mark Smith', service: 'Lobe Piercing', date: 'Nov 05, 2026', status: 'Pending' },
-    { id: '3', client: 'Alice Glass', service: 'Septum', date: 'Nov 01, 2026', status: 'Completed' },
-  ];
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [version, setVersion] = useState(0); // bump to reload
+  const [busyId, setBusyId] = useState(null);
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'Approved': return 'text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/10';
-      case 'Pending': return 'text-brand-gold border-brand-gold/30 bg-brand-gold/10';
-      case 'Completed': return 'text-brand-muted border-brand-muted/30 bg-brand-muted/10';
-      default: return 'text-brand-cream border-brand-cream/30 bg-transparent';
+  const [resched, setResched] = useState(null); // appointment being rescheduled
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listAllAppointments({ status: status || undefined })
+      .then((data) => !cancelled && (setRows(data), setError('')))
+      .catch((e) => !cancelled && setError(toUserMessage(e)))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [status, version]);
+
+  const reload = () => setVersion((v) => v + 1);
+
+  const openReschedule = async (apt) => {
+    setResched(apt);
+    setSlots([]);
+    setSlotsLoading(true);
+    try {
+      setSlots(await getAvailableSlots(new Date(), new Date(Date.now() + 30 * 86400000)));
+    } catch (e) {
+      setError(toUserMessage(e));
+      setResched(null);
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
+  const handleAction = async (apt, action) => {
+    if (action === 'reschedule') return openReschedule(apt);
+    if (CONFIRM[action] && !window.confirm(CONFIRM[action])) return;
+    setBusyId(apt.id);
+    setError('');
+    try {
+      await adminUpdateAppointment(apt.id, action);
+      reload();
+    } catch (e) {
+      setError(toUserMessage(e));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const confirmReschedule = async (slot) => {
+    const apt = resched;
+    setResched(null);
+    setBusyId(apt.id);
+    setError('');
+    try {
+      await adminUpdateAppointment(apt.id, 'reschedule', { newSlotId: slot.id });
+      reload();
+    } catch (e) {
+      setError(toUserMessage(e));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -23,15 +96,22 @@ export default function Appointments() {
           <h2 className="text-4xl font-serif text-brand-cream tracking-wide">Appointments Ledger</h2>
           <p className="text-brand-muted mt-2 font-light tracking-wide text-sm">Review and manage the complete booking history.</p>
         </div>
-        <div className="flex gap-4">
-          <button className="flex items-center gap-2 border border-brand-blood/50 text-brand-cream px-4 py-2 text-xs uppercase tracking-widest hover:bg-brand-blood/10 transition-all">
-            <Filter size={14} /> Filter
-          </button>
-          <button className="flex items-center gap-2 border border-brand-cream text-brand-cream px-6 py-2 text-xs uppercase tracking-widest hover:bg-brand-cream hover:text-brand-black transition-all">
-            <Calendar size={14} /> New Booking
-          </button>
-        </div>
+        <label className="flex items-center gap-2 border border-brand-blood/50 text-brand-cream px-4 py-2 text-xs uppercase tracking-widest">
+          <Filter size={14} />
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="bg-brand-dark text-brand-cream uppercase tracking-widest text-xs focus:outline-none"
+          >
+            <option value="">All statuses</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+            ))}
+          </select>
+        </label>
       </header>
+
+      {error && <p role="alert" className="text-sm text-red-400 font-light">{error}</p>}
 
       <div className="bg-brand-dark border border-brand-blood/20">
         <div className="overflow-x-auto">
@@ -40,26 +120,46 @@ export default function Appointments() {
               <tr className="text-brand-muted text-[10px] uppercase tracking-[0.2em] border-b border-brand-blood/20 bg-brand-black/50">
                 <th className="p-6 font-light">Client</th>
                 <th className="p-6 font-light">Service</th>
-                <th className="p-6 font-light">Date</th>
+                <th className="p-6 font-light">Date &amp; Time</th>
                 <th className="p-6 font-light">Status</th>
                 <th className="p-6 font-light text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="text-sm font-light">
-              {appointments.map((apt) => (
+              {loading && (
+                <tr><td colSpan={5} className="p-6 text-brand-muted">Loading…</td></tr>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr><td colSpan={5} className="p-6 text-brand-muted">No appointments found.</td></tr>
+              )}
+              {!loading && rows.map((apt) => (
                 <tr key={apt.id} className="border-b border-brand-blood/10 hover:bg-brand-black/30 transition-colors">
-                  <td className="p-6 text-brand-cream tracking-wide">{apt.client}</td>
-                  <td className="p-6 text-brand-muted">{apt.service}</td>
-                  <td className="p-6 text-brand-muted">{apt.date}</td>
+                  <td className="p-6 text-brand-cream tracking-wide">
+                    {apt.profiles?.full_name || 'Unnamed customer'}
+                    {apt.profiles?.phone && <div className="text-xs text-brand-muted">{apt.profiles.phone}</div>}
+                  </td>
+                  <td className="p-6 text-brand-muted">{apt.services?.name ?? '—'}</td>
+                  <td className="p-6 text-brand-muted">
+                    {apt.availability_slots ? formatManila(apt.availability_slots.starts_at) : '—'}
+                  </td>
                   <td className="p-6">
-                    <span className={`px-3 py-1 text-[10px] uppercase tracking-widest border ${getStatusColor(apt.status)}`}>
-                      {apt.status}
+                    <span className={`px-3 py-1 text-[10px] uppercase tracking-widest border ${STATUS_STYLE[apt.status] ?? ''}`}>
+                      {STATUS_LABEL[apt.status] ?? apt.status}
                     </span>
                   </td>
-                  <td className="p-6 text-right">
-                    <button className="text-brand-muted hover:text-brand-cream transition-colors">
-                      <MoreVertical size={16} />
-                    </button>
+                  <td className="p-6">
+                    <div className="flex flex-wrap justify-end gap-x-4 gap-y-2">
+                      {(ACTIONS[apt.status] ?? []).map(([action, label]) => (
+                        <button
+                          key={action}
+                          disabled={busyId === apt.id}
+                          onClick={() => handleAction(apt, action)}
+                          className="text-xs uppercase tracking-widest text-brand-muted hover:text-brand-cream transition-colors disabled:opacity-40"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -67,6 +167,42 @@ export default function Appointments() {
           </table>
         </div>
       </div>
+
+      {resched && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setResched(null)}>
+          <div
+            className="w-full max-w-md max-h-[80vh] overflow-y-auto bg-brand-dark border border-brand-blood/30 p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-2xl font-serif text-brand-cream mb-1">Reschedule</h3>
+            <p className="text-xs text-brand-muted mb-6">
+              {resched.profiles?.full_name || 'Customer'}: {resched.services?.name}. Pick a new open slot.
+            </p>
+            {slotsLoading && <p className="text-brand-muted text-sm">Loading slots…</p>}
+            {!slotsLoading && slots.length === 0 && (
+              <p className="text-brand-muted text-sm">No open slots in the next 30 days.</p>
+            )}
+            <ul className="space-y-2">
+              {slots.map((s) => (
+                <li key={s.id}>
+                  <button
+                    onClick={() => confirmReschedule(s)}
+                    className="w-full text-left border border-brand-blood/30 px-4 py-3 text-sm text-brand-cream hover:bg-brand-blood/10 transition-colors"
+                  >
+                    {formatManila(s.starts_at)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => setResched(null)}
+              className="mt-6 text-xs uppercase tracking-widest text-brand-muted hover:text-brand-cream"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
