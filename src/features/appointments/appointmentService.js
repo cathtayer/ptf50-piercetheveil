@@ -130,3 +130,45 @@ export async function updateService(id, changes) {
   if (error) throw error;
   return data;
 }
+
+// ADD these two functions to the end of src/features/appointments/appointmentService.js
+// (no new imports needed; `supabase` is already imported at the top of that file)
+
+/* ---------------- admin: service management (lookup) ---------------- */
+
+export async function listPiercingTypes() {
+  const { data, error } = await supabase.from("piercing_types").select("id, name").order("name");
+  if (error) throw error;
+  return data;
+}
+
+/* ---------------- admin: customers ---------------- */
+
+// Customer profiles plus visit stats (visits = COMPLETED appointments).
+// RLS lets admins read all profiles and appointments; customers would only see themselves.
+export async function listCustomers() {
+  const [profilesRes, apptsRes] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, phone").eq("role", "customer").order("full_name"),
+    supabase.from("appointments").select("status, profiles(id), availability_slots(starts_at)"),
+  ]);
+  if (profilesRes.error) throw profilesRes.error;
+  if (apptsRes.error) throw apptsRes.error;
+
+  const one = (v) => (Array.isArray(v) ? v[0] : v);
+  const stats = new Map(); // profileId -> { visits, lastVisit }
+  for (const a of apptsRes.data) {
+    const pid = one(a.profiles)?.id;
+    if (!pid || a.status !== "COMPLETED") continue;
+    const startsAt = one(a.availability_slots)?.starts_at ?? null;
+    const s = stats.get(pid) ?? { visits: 0, lastVisit: null };
+    s.visits += 1;
+    if (startsAt && (!s.lastVisit || startsAt > s.lastVisit)) s.lastVisit = startsAt;
+    stats.set(pid, s);
+  }
+
+  return profilesRes.data.map((p) => ({
+    ...p,
+    visits: stats.get(p.id)?.visits ?? 0,
+    lastVisit: stats.get(p.id)?.lastVisit ?? null,
+  }));
+}
