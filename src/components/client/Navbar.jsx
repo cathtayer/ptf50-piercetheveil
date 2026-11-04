@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import logo from "../../assets/PTV-logo.png";
 
 const links = [
-  { label: "Home", href: "#home" },
-  { label: "About", href: "#about" },
-  { label: "Services", href: "#price-guide" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Aftercare", href: "#care-guide" },
-  { label: "AI Stylist", href: "#recommendation" },
+  { label: "Home", href: "/#home" },
+  { label: "About", href: "/#about" },
+  { label: "Services", href: "/#price-guide" },
+  { label: "Gallery", href: "/#gallery" },
+  { label: "Aftercare", href: "/#care-guide" },
+  { label: "AI Stylist", href: "/#recommendation" },
 ];
 
 export default function Navbar() {
@@ -23,7 +23,7 @@ export default function Navbar() {
 
   return (
     <header className={`site-header ${scrolled ? "site-header--scrolled" : ""}`}>
-      <a className="brand" href="#home" aria-label="Pierce the Veil home">
+      <a className="brand" href="/#home" aria-label="Pierce the Veil home">
         <span className="brand__mark">
           <img src={logo} alt="" />
         </span>
@@ -50,7 +50,7 @@ export default function Navbar() {
             {link.label}
           </a>
         ))}
-        <a className="nav-cta" href="#instagram" onClick={() => setOpen(false)}>
+        <a className="nav-cta" href="/availability" onClick={() => setOpen(false)}>
           Check availability
         </a>
       </nav>
