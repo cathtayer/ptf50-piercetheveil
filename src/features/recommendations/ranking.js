@@ -3,6 +3,11 @@
 export const DISCLAIMER =
   'Recommendations are based on style and shop-approved placements. Your piercer confirms final suitability during your appointment.';
 
+// Provisional thresholds for cosine similarity with this model. Calibrate during the evaluation
+// with the shop owner (see evaluate.js).
+export const STRONG_MATCH = 0.45;
+export const PARTIAL_MATCH = 0.3;
+
 const peso = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n);
 
 export function buildQueryText({ style, material, color, freeText } = {}) {
@@ -35,7 +40,7 @@ export function keywordRank(items, queryText, topK = 3) {
 const same = (a, b) => a && b && String(a).toLowerCase() === String(b).toLowerCase();
 
 // Explanations come ONLY from real catalog data, never invented.
-export function buildReasons(item, prefs = {}, { piercingName, mode } = {}) {
+export function buildReasons(item, prefs = {}, { piercingName, mode, score } = {}) {
   const reasons = [];
   if (same(item.style, prefs.style)) reasons.push(`${item.style} style, as you asked`);
   if (same(item.material, prefs.material)) reasons.push(`Made of ${item.material}, as you asked`);
@@ -44,7 +49,11 @@ export function buildReasons(item, prefs = {}, { piercingName, mode } = {}) {
     reasons.push(`Within your budget (${peso(item.price)} of ${peso(prefs.budget)})`);
   }
   if (piercingName) reasons.push(`Shop-approved for ${piercingName} piercings`);
-  if (mode === 'ai' && prefs.freeText?.trim()) reasons.push('Its description closely matches what you described');
+  if (mode === 'ai' && prefs.freeText?.trim() && typeof score === 'number') {
+    if (score >= STRONG_MATCH) reasons.push('Its description closely matches what you described');
+    else if (score >= PARTIAL_MATCH) reasons.push('Its description partly matches what you described');
+    // below PARTIAL_MATCH: make no claim about the description
+  }
   if (mode === 'fallback' && prefs.freeText?.trim()) reasons.push('Its description shares keywords with what you described');
   if (item.stock > 0) reasons.push('In stock');
   return reasons;

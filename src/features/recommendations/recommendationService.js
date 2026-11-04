@@ -2,7 +2,7 @@ import { listJewelry, listPiercingTypes } from '../jewelry/jewelryService';
 import { embedText } from './embeddingService';
 import { fetchEmbeddings, isIndexFresh } from './embeddingStore';
 import { cosineSimilarity } from './similarity';
-import { DISCLAIMER, buildQueryText, buildReasons, keywordRank } from './ranking';
+import { DISCLAIMER, STRONG_MATCH, buildQueryText, buildReasons, keywordRank } from './ranking';
 
 /**
  * Recommend jewelry.  Order of operations (this is what makes it safe):
@@ -12,7 +12,7 @@ import { DISCLAIMER, buildQueryText, buildReasons, keywordRank } from './ranking
  * The AI can never recommend something that failed the filters.
  *
  * Returns { mode: 'ai' | 'fallback' | 'filter' | 'none', results: [{ item, score, reasons }], ... }
- *   ai       = ranked by the embedding model
+ *   ai       = ranked by the embedding model; check `lowConfidence` (no strong match) and say so to the customer
  *   fallback = model unavailable, ranked by simple keyword overlap (show a "basic matching" note)
  *   filter   = customer gave no preferences, so just the eligible items
  *   none     = nothing passes the filters
@@ -39,7 +39,7 @@ export async function recommend({ piercingTypeId, budget, style, material, color
     results: ranked.map(({ item, score }) => ({
       item,
       score,
-      reasons: buildReasons(item, prefs, { piercingName, mode }),
+      reasons: buildReasons(item, prefs, { piercingName, mode, score }),
     })),
     eligibleCount: eligible.length,
     queryText,
@@ -58,7 +58,13 @@ export async function recommend({ piercingTypeId, budget, style, material, color
       .map((item) => ({ item, score: cosineSimilarity(queryVector, embeds.get(item.id).embedding) }));
     if (scored.length === 0) throw new Error('AI index is empty. An admin needs to run "Update AI index".');
     scored.sort((a, b) => b.score - a.score);
-    return finish('ai', scored.slice(0, topK), { unindexedCount: eligible.length - scored.length });
+    const top = scored.slice(0, topK);
+    // lowConfidence = even the best piece is not a strong match; the UI should say so instead of overselling
+    return finish('ai', top, {
+      unindexedCount: eligible.length - scored.length,
+      bestScore: top[0].score,
+      lowConfidence: top[0].score < STRONG_MATCH,
+    });
   } catch (err) {
     console.warn('AI ranking unavailable, using keyword fallback:', err);
     return finish('fallback', keywordRank(eligible, queryText, topK), { fallbackReason: String(err?.message ?? err) });

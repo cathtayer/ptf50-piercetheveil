@@ -30,6 +30,8 @@ export async function runEvaluation(cases, { topK = 3 } = {}) {
     rows.push({
       case: c.name ?? `Case ${index + 1}`,
       mode: out.mode,
+      bestScore: out.bestScore != null ? Number(out.bestScore.toFixed(2)) : null,
+      lowConfidence: out.lowConfidence ?? null,
       top: names.join(' | '),
       precisionAt3: out.results.length ? Number((hits / out.results.length).toFixed(2)) : 0,
       constraintsOk: compliant,
