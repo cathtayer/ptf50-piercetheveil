@@ -39,7 +39,8 @@ export async function recommend({ piercingTypeId, budget, style, material, color
     results: ranked.map(({ item, score }) => ({
       item,
       score,
-      reasons: buildReasons(item, prefs, { piercingName, mode, score }),
+      // when even the best piece is only a weak match, make no claim about descriptions for ANY piece
+      reasons: buildReasons(item, prefs, { piercingName, mode, score: extra.lowConfidence ? undefined : score }),
     })),
     eligibleCount: eligible.length,
     queryText,

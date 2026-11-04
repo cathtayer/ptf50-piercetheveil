@@ -11,3 +11,6 @@ Read ARCHITECTURE.md and PROGRESS.md before coding. Do not scan the whole repo.
 - Show only changed code (diffs or changed functions), not full-file rewrites.
 - Keep answers short. Do not touch files outside the task. Ignore dist/, node_modules/, lockfiles, .pnpm-store/.
 - After finishing, suggest a one-line update for PROGRESS.md.
+- Appointments change only through the RPCs in appointmentService.js. Never insert/update appointments directly.
+- Any new table needs: enable RLS, explicit GRANTs, policies, and a test in supabase/tests.
+- Never put or ask for the Supabase secret key. Check every new JS/JSX file for syntax before delivering it.
