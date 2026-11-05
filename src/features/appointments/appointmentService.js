@@ -1,4 +1,15 @@
 import { supabase } from "../../services/supabase";
+import { toUserMessage } from "../../services/api";
+import { normalizeNotes, validateAppointmentRequest } from "./appointmentValidation";
+
+// Turns a Supabase/RPC error into an Error whose message is safe to show on screen.
+// The original error code is kept so callers can still check it (e.g. 23505).
+function toServiceError(error, message) {
+  const wrapped = new Error(message || toUserMessage(error));
+  wrapped.code = error?.code;
+  wrapped.cause = error;
+  return wrapped;
+}
 
 /* ---------------- customer ---------------- */
 
@@ -8,28 +19,41 @@ export async function listServices() {
     .select("id, name, price, duration_minutes, piercing_type_id")
     .eq("is_active", true)
     .order("price");
-  if (error) throw error;
+  if (error) throw toServiceError(error);
   return data;
 }
 
 // Open slots with remaining capacity. Pass Date objects or ISO strings.
 export async function getAvailableSlots(from, to) {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    throw new Error("Please choose a valid date range.");
+  }
   const { data, error } = await supabase.rpc("get_available_slots", {
-    p_from: new Date(from).toISOString(),
-    p_to: new Date(to).toISOString(),
+    p_from: fromDate.toISOString(),
+    p_to: toDate.toISOString(),
   });
-  if (error) throw error;
-  return data;
+  if (error) throw toServiceError(error);
+  return data ?? [];
 }
 
 // Creates a PENDING request. Returns the new appointment id.
-export async function requestAppointment({ serviceId, slotId, notes }) {
+// Inputs are validated first; failures throw an Error with a message safe to show on screen.
+// `slotStartsAt` is optional: pass the chosen slot's starts_at to also check it is in the future.
+export async function requestAppointment({ serviceId, slotId, notes, slotStartsAt }) {
+  const check = validateAppointmentRequest({ serviceId, slotId, notes, slotStartsAt });
+  if (!check.ok) throw new Error(check.message);
+
   const { data, error } = await supabase.rpc("request_appointment", {
     p_service_id: serviceId,
     p_slot_id: slotId,
-    p_notes: notes ?? null,
+    p_notes: normalizeNotes(notes) || null,
   });
-  if (error) throw error;
+  if (error) {
+    const needsLogin = (error.message || "").includes("Not authenticated");
+    throw toServiceError(error, needsLogin ? "Please log in to request an appointment" : undefined);
+  }
   return data;
 }
 
