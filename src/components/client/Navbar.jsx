@@ -21,6 +21,27 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("nav-open", open);
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    const onResize = () => {
+      if (window.innerWidth > 820) setOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      document.body.classList.remove("nav-open");
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
+
   return (
     <header className={`site-header ${scrolled ? "site-header--scrolled" : ""}`}>
       <a className="brand" href="/#home" aria-label="Pierce the Veil home">
@@ -34,9 +55,10 @@ export default function Navbar() {
       </a>
 
       <button
-        className="menu-toggle"
+        className={`menu-toggle ${open ? "menu-toggle--open" : ""}`}
         type="button"
-        aria-label="Toggle navigation"
+        aria-label={open ? "Close navigation" : "Open navigation"}
+        aria-controls="primary-navigation"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
@@ -44,7 +66,11 @@ export default function Navbar() {
         <span />
       </button>
 
-      <nav className={`main-nav ${open ? "main-nav--open" : ""}`} aria-label="Primary navigation">
+      <nav
+        className={`main-nav ${open ? "main-nav--open" : ""}`}
+        id="primary-navigation"
+        aria-label="Primary navigation"
+      >
         {links.map((link) => (
           <a key={link.href} href={link.href} onClick={() => setOpen(false)}>
             {link.label}
