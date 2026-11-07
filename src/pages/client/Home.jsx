@@ -1,9 +1,8 @@
 import { useState } from "react";
 import CareGuide from "../../components/client/CareGuide";
-import Footer from "../../components/client/Footer";
 import GallerySection from "../../components/client/GallerySection";
 import InstagramSection from "../../components/client/InstagramSection";
-import Navbar from "../../components/client/Navbar";
+import { Link } from "react-router-dom";
 import ServicesGuide from "../../components/client/ServicesGuide";
 import logo from "../../assets/PTV-logo.png";
 
@@ -97,9 +96,7 @@ export default function Home() {
   const [metal, setMetal] = useState("Titanium");
 
   return (
-    <div className="page-shell">
-      <Navbar />
-
+    <>
       <main>
         <section className="hero" id="home">
           <div className="hero__texture" />
@@ -191,7 +188,8 @@ export default function Home() {
               </article>
             ))}
           </div>
-          <p className="collection__note">Collection imagery is an artistic preview; the live catalog will reflect available shop inventory.</p>
+          <p className="collection__note">Collection imagery is an artistic preview; the live catalog reflects available shop inventory.</p>
+          <p className="collection__cta"><Link className="button button--dark" to="/catalog">Browse the live catalog</Link></p>
         </section>
 
         <GallerySection />
@@ -200,7 +198,7 @@ export default function Home() {
 
         <section className="recommendation section" id="recommendation">
           <div className="recommendation__copy">
-            <p className="eyebrow"><span /> PierceWise · coming to the client portal</p>
+            <p className="eyebrow"><span /> PierceWise · AI jewelry stylist</p>
             <h2>Your taste,<br /><em>translated.</em></h2>
             <p className="recommendation__lede">
               Tell us what feels like you. PierceWise is designed to use browser-side
@@ -211,7 +209,8 @@ export default function Home() {
               <li><span>02</span> The on-device model compares meaning across the catalog.</li>
               <li><span>03</span> Explore three strong matches and why they fit.</li>
             </ol>
-            <p className="privacy-note">Private by design · model inference planned for the browser</p>
+            <p className="privacy-note">Private by design · the model runs in your browser</p>
+            <p><Link className="button button--light" to="/recommend">Try the AI stylist</Link></p>
           </div>
 
           <div className="stylist-card">
@@ -265,7 +264,7 @@ export default function Home() {
             </div>
 
             <p className="stylist-card__disclaimer">
-              This homepage demonstrates the client interface. ML recommendations will be connected in the dedicated feature flow.
+              This is a preview. The live AI stylist, with real catalog matches, is on its own page.
             </p>
           </div>
         </section>
@@ -281,8 +280,6 @@ export default function Home() {
 
         <InstagramSection />
       </main>
-
-      <Footer />
-    </div>
+    </>
   );
 }

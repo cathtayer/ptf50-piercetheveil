@@ -18,10 +18,11 @@
 ## Not done
 - Run 0007 on the live DB, then deploy the matching front end together (booking page + admin pages changed). Turn off
   "Allow new users to sign up" in Supabase Auth. Optionally delete the test1/2/3 customer users.
-- Booking page now collects name/phone/email and shows a reference code. Backend for look-up/cancel by code exists
-  (get_booking, cancel_booking) but there is no page for it yet (planned: BookingLookup).
-- Customer side (teammate): Catalog, JewelryDetails, AIRecommendation, ClientRoutes/ClientLayout; AppRoutes still sends
-  every non-admin path except /availability to Home. No customer login/register/profile (by design).
+- PUBLIC SITE (built, builds clean, all routes render in a server-render smoke test; NOT yet clicked through in a browser):
+  ClientLayout + ClientRoutes, Catalog (client-side filters), JewelryDetails, AIRecommendation (uses recommend(); shows model
+  download progress, ai/fallback/filter/none states, reasons, disclaimer), BookingLookup (look up + cancel by code + phone).
+- Booking page collects name/phone/email and shows a reference code that links to /booking.
+- No customer login/register/profile (by design). Unknown URLs redirect to Home.
 - Real catalog: 15-20 real pieces with good descriptions + approved placements (waiting on shop owner)
 - Evaluation: owner marks Y/N per case/piece (sheet is generated from the catalog export), run runEvaluation(),
   calibrate STRONG/PARTIAL thresholds, write up results (include the Taglish cases)
@@ -50,5 +51,5 @@
 ## Next up
 1. Send catalog request to the shop owner; enter the real catalog; run the SQL export so the marking sheet can be generated
 2. Evaluation: owner marking, runEvaluation(), calibrate thresholds
-3. Run 0007 + deploy; then client routes/layout, Catalog, AIRecommendation, BookingLookup page
+3. Deploy; click through every public page on a phone; check the AI stylist's first model load on mobile data
 4. Mid-Nov: npm audit fix (commit first, re-test)

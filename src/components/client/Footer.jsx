@@ -18,7 +18,7 @@ export default function Footer() {
       </div>
 
       <div className="site-footer__end">
-        <a href="#home">Back to the top ↑</a>
+        <a href="#top" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Back to the top ↑</a>
         <small>© {new Date().getFullYear()} Pierce the Veil</small>
       </div>
     </footer>

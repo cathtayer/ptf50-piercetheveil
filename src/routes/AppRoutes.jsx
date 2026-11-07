@@ -1,15 +1,13 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AdminRoutes from './AdminRoutes';
-import Home from '../pages/client/Home';
-import Appointment from '../pages/client/Appointment';
+import ClientRoutes from './ClientRoutes';
 
 export default function AppRoutes() {
   return (
     <Router>
       <Routes>
         <Route path="/admin/*" element={<AdminRoutes />} />
-        <Route path="/availability" element={<Appointment />} />
-        <Route path="/*" element={<Home />} />
+        <Route path="/*" element={<ClientRoutes />} />
       </Routes>
     </Router>
   );

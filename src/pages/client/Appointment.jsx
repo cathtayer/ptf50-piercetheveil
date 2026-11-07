@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import Footer from "../../components/client/Footer";
-import Navbar from "../../components/client/Navbar";
+import { Link } from "react-router-dom";
 import {
   useAvailableSlots,
   useRequestAppointment,
@@ -195,9 +194,7 @@ export default function Appointment() {
   };
 
   return (
-    <div className="page-shell availability-page">
-      <Navbar />
-
+    <div className="availability-page">
       <main>
         <section className="availability-hero">
           <div className="availability-hero__texture" />
@@ -440,6 +437,7 @@ export default function Appointment() {
                   <p className="booking-confirmation__label">Your reference code</p>
                   <p className="booking-confirmation__code">{formatReference(confirmation.reference)}</p>
                   <p>Take a screenshot or write it down. You will need this code and your mobile number to check or cancel your request.</p>
+                  <p><Link to={`/booking?ref=${confirmation.reference}`}>Check or cancel this request later</Link></p>
                   <button className="booking-summary__cta" type="button" onClick={startAnotherRequest}>
                     Make another request <span>→</span>
                   </button>
@@ -457,8 +455,6 @@ export default function Appointment() {
           </div>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 }

@@ -11,10 +11,12 @@ Hosting: Vercel Hobby, https://ptf50-piercetheveil.vercel.app, deployed from the
 AI: Transformers.js 4.2.0 in the browser, model Xenova/all-MiniLM-L6-v2 (dtype q8, ~23 MB), cosine similarity.
 
 ## Folder map (src/)
-- pages/client, pages/admin | layouts/AdminLayout | routes/AppRoutes, AdminRoutes, ProtectedRoute
+- pages/client, pages/admin | layouts/ClientLayout (navbar+footer for all public pages), AdminLayout | routes/AppRoutes, ClientRoutes, AdminRoutes, ProtectedRoute
+- Public routes: / (Home), /catalog, /catalog/:id, /recommend (AI stylist), /availability (booking), /booking (look up/cancel by code). No login.
 - context/AuthContext.jsx + hooks/useAuth.js -> { user, profile, isAdmin, loading }
 - services/supabase.js (client), services/api.js (toUserMessage, formatManila)
 - styles/index.css (global stylesheet; @import fonts first, then @tailwind lines)
+- features/jewelry/jewelryFilters.js (pure catalog filters) | components/client: ProductCard, PageHero, Navbar, Footer
 - features/authentication/authService.js (admin sign in/out + profile only; customers are guests)
 - features/jewelry/jewelryService.js (catalog, admin CRUD, placements, image upload)
 - features/appointments/appointmentService.js (services, slots, booking, admin actions, schedule/service management,

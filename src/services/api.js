@@ -33,3 +33,8 @@ export function toUserMessage(error) {
 export function formatManila(iso, opts = { dateStyle: "medium", timeStyle: "short" }) {
   return new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", ...opts }).format(new Date(iso));
 }
+
+// "PHP 1,250.00" style price for display.
+export function formatPeso(amount) {
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(Number(amount) || 0);
+}

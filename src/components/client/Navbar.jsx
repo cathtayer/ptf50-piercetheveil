@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import logo from "../../assets/PTV-logo.png";
 
 const links = [
@@ -7,7 +8,9 @@ const links = [
   { label: "Services", href: "/#price-guide" },
   { label: "Gallery", href: "/#gallery" },
   { label: "Aftercare", href: "/#care-guide" },
-  { label: "AI Stylist", href: "/#recommendation" },
+  { label: "Catalog", to: "/catalog" },
+  { label: "AI Stylist", to: "/recommend" },
+  { label: "My booking", to: "/booking" },
 ];
 
 export default function Navbar() {
@@ -44,7 +47,7 @@ export default function Navbar() {
 
   return (
     <header className={`site-header ${scrolled ? "site-header--scrolled" : ""}`}>
-      <a className="brand" href="/#home" aria-label="Pierce the Veil home">
+      <Link className="brand" to="/" aria-label="Pierce the Veil home">
         <span className="brand__mark">
           <img src={logo} alt="" />
         </span>
@@ -52,7 +55,7 @@ export default function Navbar() {
           Pierce the Veil
           <small>Angeles City</small>
         </span>
-      </a>
+      </Link>
 
       <button
         className={`menu-toggle ${open ? "menu-toggle--open" : ""}`}
@@ -71,14 +74,20 @@ export default function Navbar() {
         id="primary-navigation"
         aria-label="Primary navigation"
       >
-        {links.map((link) => (
-          <a key={link.href} href={link.href} onClick={() => setOpen(false)}>
-            {link.label}
-          </a>
-        ))}
-        <a className="nav-cta" href="/availability" onClick={() => setOpen(false)}>
+        {links.map((link) =>
+          link.to ? (
+            <Link key={link.to} to={link.to} onClick={() => setOpen(false)}>
+              {link.label}
+            </Link>
+          ) : (
+            <a key={link.href} href={link.href} onClick={() => setOpen(false)}>
+              {link.label}
+            </a>
+          ),
+        )}
+        <Link className="nav-cta" to="/availability" onClick={() => setOpen(false)}>
           Check availability
-        </a>
+        </Link>
       </nav>
     </header>
   );
