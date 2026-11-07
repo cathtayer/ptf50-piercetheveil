@@ -84,12 +84,13 @@ export function useAvailableSlots(from, to) {
 }
 
 // Sends a booking request. `request(input)` never throws: it resolves to
-// { ok: true, id } on success or { ok: false, message } on failure.
+// { ok: true, id, reference } on success or { ok: false, message } on failure.
 export function useRequestAppointment() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [appointmentId, setAppointmentId] = useState(null);
+  const [reference, setReference] = useState("");
   const mountedRef = useRef(true);
   const busyRef = useRef(false);
 
@@ -109,12 +110,13 @@ export function useRequestAppointment() {
     setError("");
     setSuccess(false);
     try {
-      const id = await requestAppointment(input);
+      const { id, reference: code } = await requestAppointment(input);
       if (mountedRef.current) {
         setAppointmentId(id);
+        setReference(code);
         setSuccess(true);
       }
-      return { ok: true, id };
+      return { ok: true, id, reference: code };
     } catch (e) {
       const message = toUserMessage(e);
       if (mountedRef.current) setError(message);
@@ -129,7 +131,8 @@ export function useRequestAppointment() {
     setError("");
     setSuccess(false);
     setAppointmentId(null);
+    setReference("");
   }, []);
 
-  return { request, submitting, error, success, appointmentId, reset };
+  return { request, submitting, error, success, appointmentId, reference, reset };
 }

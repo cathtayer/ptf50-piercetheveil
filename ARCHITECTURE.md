@@ -15,30 +15,33 @@ AI: Transformers.js 4.2.0 in the browser, model Xenova/all-MiniLM-L6-v2 (dtype q
 - context/AuthContext.jsx + hooks/useAuth.js -> { user, profile, isAdmin, loading }
 - services/supabase.js (client), services/api.js (toUserMessage, formatManila)
 - styles/index.css (global stylesheet; @import fonts first, then @tailwind lines)
-- features/authentication/authService.js
+- features/authentication/authService.js (admin sign in/out + profile only; customers are guests)
 - features/jewelry/jewelryService.js (catalog, admin CRUD, placements, image upload)
 - features/appointments/appointmentService.js (services, slots, booking, admin actions, schedule/service management,
   listCustomers, listPiercingTypes) + appointmentStatus.js
 - features/recommendations/: recommendationService (recommend()), embeddingService (model), embeddingStore (index in DB),
   ranking (pure helpers, keyword fallback, reasons), similarity, evaluate (report harness)
-- supabase/migrations/0001..0006 (run in order), supabase/tests/backend_checks.sql
+- supabase/migrations/0001..0007 (run in order), supabase/tests/backend_checks.sql + guest_booking_checks.sql
 - scripts/copy-ort.mjs -> copies the WASM runtime to public/ort (gitignored; runs on predev/prebuild)
 
 ## Admin pages (pages/admin) and their data
 - Schedule: availability_slots via listSlots/createSlot/setSlotBlocked. Hours are derived from slots (no hours table);
   a date is "blocked" when all its slots are blocked.
 - Services: listAllServices/createService/updateService (is_active toggle), listPiercingTypes for the type dropdown.
-- Customers: listCustomers = profiles(role customer) + COMPLETED appointment stats. No email (not in profiles).
+- Customers ("clients"): listCustomers groups appointments by guest_phone (name/email from the latest booking) with request and COMPLETED-visit counts.
 
 ## Data model (UUID PKs, UTC timestamps, display Asia/Manila)
-profiles(role customer|admin) | piercing_types | services | jewelry | jewelry_compatibility(approved) |
+profiles(admin accounts; role customer|admin) | piercing_types | services | jewelry | jewelry_compatibility(approved) |
 jewelry_embeddings(model key, source_text, embedding jsonb) | availability_slots(capacity, is_blocked) |
-appointments(customer_id, service_id, slot_id, status, notes) | appointment_events (audit) | recommendation_feedback
+appointments(guest_name, guest_phone, guest_email, reference_code, service_id, slot_id, status, notes) | appointment_events (audit) | recommendation_feedback
 
 ## Security model
 - RLS on every table. Only the PUBLISHABLE key is in the app; the secret key is never used.
-- Appointments are changed ONLY via RPCs: get_available_slots, request_appointment, cancel_my_appointment,
-  admin_update_appointment. Direct insert/update is blocked.
+- Customers have NO accounts. Visitors (anon) may only call get_available_slots, request_appointment, get_booking, cancel_booking.
+  Appointments are changed ONLY via RPCs; direct insert/update is blocked; only admins can read the appointments table.
+- Guest abuse limits (in request_appointment): max 3 active bookings per phone, max 20 new requests per 10 minutes overall,
+  same phone cannot hold a slot twice. Lookup/cancel need reference code + phone (same error for either being wrong).
+  recommendation_feedback still has customer_id (dormant, unused): drop it or make it anonymous before using it.
 - Admin role can only be set in the SQL editor (column grant + trigger protect_profile_role).
 - PENDING and APPROVED both hold a slot. Flow: PENDING -> APPROVED/REJECTED/CANCELLED; APPROVED -> COMPLETED/CANCELLED/NO_SHOW.
 

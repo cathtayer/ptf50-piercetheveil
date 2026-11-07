@@ -1,17 +1,7 @@
 import { supabase } from "../../services/supabase";
 
-// NOTE: Supabase requires email confirmation by default. For development you can turn it off in
-// Dashboard > Authentication > Sign In / Providers > Email > "Confirm email".
-
-export async function signUp({ email, password, fullName }) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } }, // the DB trigger copies this into profiles
-  });
-  if (error) throw error;
-  return data; // data.session is null when email confirmation is required
-}
+// Only the shop admin signs in. Customers book as guests (no accounts, no sign-up).
+// Admin accounts are created in the Supabase dashboard (see README > Admin accounts).
 
 export async function signIn({ email, password }) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -41,18 +31,6 @@ export async function getProfile(userId) {
     .from("profiles")
     .select("id, full_name, phone, role")
     .eq("id", userId)
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-// Customers can only change full_name and phone (role is locked in the database).
-export async function updateProfile(userId, { fullName, phone }) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ full_name: fullName, phone })
-    .eq("id", userId)
-    .select("id, full_name, phone, role")
     .single();
   if (error) throw error;
   return data;

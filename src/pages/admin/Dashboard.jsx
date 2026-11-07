@@ -104,7 +104,10 @@ export default function Dashboard() {
                 const start = req.availability_slots?.starts_at;
                 return (
                   <tr key={req.id} className="border-b border-brand-blood/10 hover:bg-brand-black/30 transition-colors">
-                    <td className="p-6 text-brand-cream tracking-wide">{req.profiles?.full_name || 'Unnamed customer'}</td>
+                    <td className="p-6 text-brand-cream tracking-wide">
+                      {req.guest_name}
+                      <div className="text-xs text-brand-muted">{req.guest_phone}</div>
+                    </td>
                     <td className="p-6 text-brand-muted">{req.services?.name ?? '—'}</td>
                     <td className="p-6 text-brand-muted">
                       {start ? (

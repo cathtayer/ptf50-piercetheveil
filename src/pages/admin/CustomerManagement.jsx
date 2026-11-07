@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Phone } from 'lucide-react';
+import { Search, Phone, Mail } from 'lucide-react';
 import { listCustomers } from '../../features/appointments/appointmentService';
 import { toUserMessage } from '../../services/api';
 
@@ -40,7 +40,10 @@ export default function CustomerManagement() {
     const q = query.trim().toLowerCase();
     if (!q) return customers;
     return customers.filter(
-      (c) => (c.full_name ?? '').toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
+      (c) =>
+        (c.full_name ?? '').toLowerCase().includes(q) ||
+        (c.phone ?? '').toLowerCase().includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q)
     );
   }, [customers, query]);
 
@@ -49,7 +52,7 @@ export default function CustomerManagement() {
       <header className="border-b border-brand-blood/30 pb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h2 className="text-4xl font-serif text-brand-cream tracking-wide">Client Records</h2>
-          <p className="text-brand-muted mt-2 font-light tracking-wide text-sm">View client information and booking history.</p>
+          <p className="text-brand-muted mt-2 font-light tracking-wide text-sm">Clients who have requested a booking, grouped by mobile number.</p>
         </div>
 
         <div className="relative">
@@ -74,22 +77,32 @@ export default function CustomerManagement() {
         <p className="text-brand-muted text-sm font-light">Loading clients...</p>
       ) : filtered.length === 0 ? (
         <p className="text-brand-muted text-sm font-light">
-          {customers.length === 0 ? 'No clients have registered yet.' : 'No clients match your search.'}
+          {customers.length === 0 ? 'No booking requests yet.' : 'No clients match your search.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filtered.map((client) => (
             <div key={client.id} className="bg-brand-dark border border-brand-blood/20 p-6 group hover:border-brand-blood/50 transition-colors">
-              <h3 className="text-xl font-serif text-brand-cream mb-4">{client.full_name || 'Unnamed client'}</h3>
+              <h3 className="text-xl font-serif text-brand-cream mb-4">{client.full_name}</h3>
 
               <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-3 text-brand-muted text-sm font-light">
                   <Phone size={14} className="text-brand-blood" />
-                  {client.phone || 'No phone on file'}
+                  {client.phone}
                 </div>
+                {client.email && (
+                  <div className="flex items-center gap-3 text-brand-muted text-sm font-light">
+                    <Mail size={14} className="text-brand-blood" />
+                    {client.email}
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-brand-blood/20">
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-brand-blood/20">
+                <div>
+                  <p className="text-[10px] text-brand-muted uppercase tracking-widest mb-1">Requests</p>
+                  <p className="text-brand-cream font-serif text-lg">{client.bookings}</p>
+                </div>
                 <div>
                   <p className="text-[10px] text-brand-muted uppercase tracking-widest mb-1">Total Visits</p>
                   <p className="text-brand-cream font-serif text-lg">{client.visits}</p>

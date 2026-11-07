@@ -8,3 +8,7 @@ dist
 .pnpm-store
 public/ort
 .vercel
+
+# Vite cache and leftovers
+.vite
+/deps

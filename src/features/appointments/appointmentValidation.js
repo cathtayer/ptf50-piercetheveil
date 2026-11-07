@@ -1,7 +1,11 @@
-// Pure validation helpers for the customer booking path.
+// Pure validation helpers for the guest booking path.
 // No Supabase calls and no React here, so they are easy to test and reuse.
+// The database repeats these rules (0007_guest_booking.sql); it always has the final say.
 
 export const MAX_NOTES_LENGTH = 500;
+export const MAX_NAME_LENGTH = 80;
+
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const isBlank = (value) =>
   value === null || value === undefined || String(value).trim() === "";
@@ -15,6 +19,34 @@ export function normalizeNotes(notes) {
 export function validateNotes(notes) {
   if (normalizeNotes(notes).length > MAX_NOTES_LENGTH) {
     return { ok: false, message: `Notes must be ${MAX_NOTES_LENGTH} characters or fewer.` };
+  }
+  return { ok: true };
+}
+
+// "+63 917 123 4567", "0917-123-4567" and "9171234567" all become "09171234567".
+// Other numbers must have 7-15 digits. Returns null when the number is not usable.
+// Mirrors normalize_phone() in the database.
+export function normalizePhone(value) {
+  let digits = String(value ?? "").replace(/\D/g, "");
+  if (/^639\d{9}$/.test(digits)) digits = `0${digits.slice(2)}`;
+  else if (/^9\d{9}$/.test(digits)) digits = `0${digits}`;
+  return /^\d{7,15}$/.test(digits) ? digits : null;
+}
+
+// Name and phone are required, email is optional.
+// Returns { ok: true } or { ok: false, field, message }.
+export function validateGuestDetails({ name, phone, email } = {}) {
+  const cleanName = String(name ?? "").trim();
+  if (cleanName.length < 2) return { ok: false, field: "name", message: "Please enter your name." };
+  if (cleanName.length > MAX_NAME_LENGTH) {
+    return { ok: false, field: "name", message: `Name must be ${MAX_NAME_LENGTH} characters or fewer.` };
+  }
+  if (isBlank(phone) || !normalizePhone(phone)) {
+    return { ok: false, field: "phone", message: "Please enter a valid mobile number, e.g. 0917 123 4567." };
+  }
+  const cleanEmail = String(email ?? "").trim();
+  if (cleanEmail && (cleanEmail.length > 254 || !EMAIL_PATTERN.test(cleanEmail))) {
+    return { ok: false, field: "email", message: "That email address does not look right." };
   }
   return { ok: true };
 }
@@ -35,11 +67,14 @@ export function validateSlotStart(startsAt, now = new Date()) {
 // `slotStartsAt` is optional: when given, the slot must start in the future.
 // The database still makes the final decision on availability.
 export function validateAppointmentRequest(
-  { serviceId, slotId, notes, slotStartsAt } = {},
+  { serviceId, slotId, guestName, guestPhone, guestEmail, notes, slotStartsAt } = {},
   now = new Date(),
 ) {
   if (isBlank(serviceId)) return { ok: false, message: "Please choose a service." };
   if (isBlank(slotId)) return { ok: false, message: "Please choose an available time." };
+
+  const guestCheck = validateGuestDetails({ name: guestName, phone: guestPhone, email: guestEmail });
+  if (!guestCheck.ok) return guestCheck;
 
   const notesCheck = validateNotes(notes);
   if (!notesCheck.ok) return notesCheck;
@@ -50,4 +85,10 @@ export function validateAppointmentRequest(
   }
 
   return { ok: true };
+}
+
+// "ABCD2345" -> "ABCD-2345" (easier to read out loud or copy). Accepts any casing and separators.
+export function formatReference(code) {
+  const clean = String(code ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return clean.length === 8 ? `${clean.slice(0, 4)}-${clean.slice(4)}` : clean;
 }

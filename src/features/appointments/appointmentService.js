@@ -11,7 +11,7 @@ function toServiceError(error, message) {
   return wrapped;
 }
 
-/* ---------------- customer ---------------- */
+/* ---------------- public (guests; no account needed) ---------------- */
 
 export async function listServices() {
   const { data, error } = await supabase
@@ -38,37 +38,45 @@ export async function getAvailableSlots(from, to) {
   return data ?? [];
 }
 
-// Creates a PENDING request. Returns the new appointment id.
+// Creates a PENDING request for a guest. Returns { id, reference } (show `reference` to the guest).
 // Inputs are validated first; failures throw an Error with a message safe to show on screen.
 // `slotStartsAt` is optional: pass the chosen slot's starts_at to also check it is in the future.
-export async function requestAppointment({ serviceId, slotId, notes, slotStartsAt }) {
-  const check = validateAppointmentRequest({ serviceId, slotId, notes, slotStartsAt });
+export async function requestAppointment({ serviceId, slotId, guestName, guestPhone, guestEmail, notes, slotStartsAt }) {
+  const check = validateAppointmentRequest({ serviceId, slotId, guestName, guestPhone, guestEmail, notes, slotStartsAt });
   if (!check.ok) throw new Error(check.message);
 
   const { data, error } = await supabase.rpc("request_appointment", {
     p_service_id: serviceId,
     p_slot_id: slotId,
+    p_guest_name: String(guestName).trim(),
+    p_guest_phone: guestPhone, // the database normalizes the number
+    p_guest_email: String(guestEmail ?? "").trim() || null,
     p_notes: normalizeNotes(notes) || null,
   });
-  if (error) {
-    const needsLogin = (error.message || "").includes("Not authenticated");
-    throw toServiceError(error, needsLogin ? "Please log in to request an appointment" : undefined);
-  }
-  return data;
+  if (error) throw toServiceError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return { id: row.booking_id, reference: row.booking_reference };
 }
 
-export async function listMyAppointments() {
-  const { data, error } = await supabase
-    .from("appointments")
-    .select("id, status, notes, created_at, services(name, price, duration_minutes), availability_slots(starts_at, ends_at)")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data; // RLS already limits this to the signed-in customer
+// Look up a booking with its reference code + the phone number used to book it.
+export async function getBooking({ reference, phone }) {
+  const { data, error } = await supabase.rpc("get_booking", { p_reference: reference, p_phone: phone });
+  if (error) throw toServiceError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    reference: row.booking_reference,
+    status: row.status,
+    serviceName: row.service_name,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    createdAt: row.created_at,
+  };
 }
 
-export async function cancelMyAppointment(id) {
-  const { error } = await supabase.rpc("cancel_my_appointment", { p_id: id });
-  if (error) throw error;
+// Cancel a PENDING/APPROVED booking with its reference code + phone number.
+export async function cancelBooking({ reference, phone }) {
+  const { error } = await supabase.rpc("cancel_booking", { p_reference: reference, p_phone: phone });
+  if (error) throw toServiceError(error);
 }
 
 /* ---------------- admin ---------------- */
@@ -77,7 +85,7 @@ export async function listAllAppointments({ status } = {}) {
   let q = supabase
     .from("appointments")
     .select(
-      "id, status, notes, created_at, profiles(full_name, phone), services(name, price), availability_slots(starts_at, ends_at)"
+      "id, status, notes, created_at, reference_code, guest_name, guest_phone, guest_email, services(name, price), availability_slots(starts_at, ends_at)"
     )
     .order("created_at", { ascending: false });
   if (status) q = q.eq("status", status);
@@ -155,9 +163,6 @@ export async function updateService(id, changes) {
   return data;
 }
 
-// ADD these two functions to the end of src/features/appointments/appointmentService.js
-// (no new imports needed; `supabase` is already imported at the top of that file)
-
 /* ---------------- admin: service management (lookup) ---------------- */
 
 export async function listPiercingTypes() {
@@ -166,33 +171,41 @@ export async function listPiercingTypes() {
   return data;
 }
 
-/* ---------------- admin: customers ---------------- */
+/* ---------------- admin: clients ---------------- */
 
-// Customer profiles plus visit stats (visits = COMPLETED appointments).
-// RLS lets admins read all profiles and appointments; customers would only see themselves.
+// There are no customer accounts, so "clients" are guests grouped by phone number.
+// The name and email shown are from their most recent booking.
+// visits = COMPLETED appointments; bookings = every request they have made.
 export async function listCustomers() {
-  const [profilesRes, apptsRes] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone").eq("role", "customer").order("full_name"),
-    supabase.from("appointments").select("status, profiles(id), availability_slots(starts_at)"),
-  ]);
-  if (profilesRes.error) throw profilesRes.error;
-  if (apptsRes.error) throw apptsRes.error;
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("status, created_at, guest_name, guest_phone, guest_email, availability_slots(starts_at)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
 
   const one = (v) => (Array.isArray(v) ? v[0] : v);
-  const stats = new Map(); // profileId -> { visits, lastVisit }
-  for (const a of apptsRes.data) {
-    const pid = one(a.profiles)?.id;
-    if (!pid || a.status !== "COMPLETED") continue;
-    const startsAt = one(a.availability_slots)?.starts_at ?? null;
-    const s = stats.get(pid) ?? { visits: 0, lastVisit: null };
-    s.visits += 1;
-    if (startsAt && (!s.lastVisit || startsAt > s.lastVisit)) s.lastVisit = startsAt;
-    stats.set(pid, s);
+  const clients = new Map(); // phone -> client (rows arrive newest first)
+  for (const a of data) {
+    let c = clients.get(a.guest_phone);
+    if (!c) {
+      c = {
+        id: a.guest_phone,
+        full_name: a.guest_name,
+        phone: a.guest_phone,
+        email: a.guest_email,
+        bookings: 0,
+        visits: 0,
+        lastVisit: null,
+      };
+      clients.set(a.guest_phone, c);
+    }
+    if (!c.email && a.guest_email) c.email = a.guest_email;
+    c.bookings += 1;
+    if (a.status === "COMPLETED") {
+      c.visits += 1;
+      const startsAt = one(a.availability_slots)?.starts_at ?? null;
+      if (startsAt && (!c.lastVisit || startsAt > c.lastVisit)) c.lastVisit = startsAt;
+    }
   }
-
-  return profilesRes.data.map((p) => ({
-    ...p,
-    visits: stats.get(p.id)?.visits ?? 0,
-    lastVisit: stats.get(p.id)?.lastVisit ?? null,
-  }));
+  return [...clients.values()].sort((x, y) => (x.full_name ?? "").localeCompare(y.full_name ?? ""));
 }

@@ -135,8 +135,10 @@ export default function Appointments() {
               {!loading && rows.map((apt) => (
                 <tr key={apt.id} className="border-b border-brand-blood/10 hover:bg-brand-black/30 transition-colors">
                   <td className="p-6 text-brand-cream tracking-wide">
-                    {apt.profiles?.full_name || 'Unnamed customer'}
-                    {apt.profiles?.phone && <div className="text-xs text-brand-muted">{apt.profiles.phone}</div>}
+                    {apt.guest_name}
+                    <div className="text-xs text-brand-muted">{apt.guest_phone}</div>
+                    {apt.guest_email && <div className="text-xs text-brand-muted">{apt.guest_email}</div>}
+                    <div className="text-[10px] tracking-widest text-brand-muted/70 mt-1">Ref {apt.reference_code}</div>
                   </td>
                   <td className="p-6 text-brand-muted">{apt.services?.name ?? '—'}</td>
                   <td className="p-6 text-brand-muted">
@@ -176,7 +178,7 @@ export default function Appointments() {
           >
             <h3 className="text-2xl font-serif text-brand-cream mb-1">Reschedule</h3>
             <p className="text-xs text-brand-muted mb-6">
-              {resched.profiles?.full_name || 'Customer'}: {resched.services?.name}. Pick a new open slot.
+              {resched.guest_name}: {resched.services?.name}. Pick a new open slot.
             </p>
             {slotsLoading && <p className="text-brand-muted text-sm">Loading slots…</p>}
             {!slotsLoading && slots.length === 0 && (

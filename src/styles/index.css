@@ -3540,3 +3540,108 @@ body.nav-open {
     grid-template-columns: 1fr;
   }
 }
+
+/* Guest booking: contact details form and confirmation */
+.guest-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.guest-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.guest-form label:first-child {
+  grid-column: 1 / -1;
+}
+
+.guest-form label span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.guest-form label span em {
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.guest-form input {
+  background: rgba(252, 246, 236, 0.58);
+  border: 1px solid rgba(65, 2, 1, 0.16);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  min-height: 48px;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.guest-form input:focus {
+  border-color: var(--rust);
+  outline: 2px solid rgba(165, 90, 64, 0.28);
+  outline-offset: 1px;
+}
+
+.guest-form__privacy {
+  color: var(--muted);
+  font-size: 10px;
+  grid-column: 1 / -1;
+  line-height: 1.55;
+  margin: 2px 0 0;
+}
+
+.booking-confirmation {
+  border-top: 1px solid rgba(247, 206, 133, 0.3);
+  margin-top: 22px;
+  padding-top: 20px;
+}
+
+.booking-confirmation > strong {
+  color: var(--gold);
+  display: block;
+  font-family: var(--serif);
+  font-size: 26px;
+}
+
+.booking-confirmation p {
+  color: rgba(252, 246, 236, 0.78);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+
+.booking-confirmation__label {
+  font-size: 8px !important;
+  letter-spacing: 0.16em;
+  margin-top: 18px !important;
+  text-transform: uppercase;
+}
+
+.booking-confirmation__code {
+  background: rgba(252, 246, 236, 0.08);
+  border: 1px dashed rgba(247, 206, 133, 0.6);
+  color: var(--gold) !important;
+  font-family: var(--serif);
+  font-size: 34px !important;
+  letter-spacing: 0.12em;
+  margin: 6px 0 12px !important;
+  padding: 10px 14px;
+  text-align: center;
+  user-select: all;
+}
+
+.booking-confirmation .booking-summary__cta {
+  margin-top: 16px;
+}
+
+@media (max-width: 520px) {
+  .guest-form {
+    grid-template-columns: 1fr;
+  }
+}

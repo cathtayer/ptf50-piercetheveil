@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import Footer from "../../components/client/Footer";
 import Navbar from "../../components/client/Navbar";
-import { useAuth } from "../../hooks/useAuth";
 import {
   useAvailableSlots,
   useRequestAppointment,
   useServices,
 } from "../../hooks/useAppointments";
 import { formatManila } from "../../services/api";
+import { formatReference, validateGuestDetails } from "../../features/appointments/appointmentValidation";
 
 const MANILA_OFFSET = "+08:00";
 const SETTING_LABELS = { address: "Client address", popup: "Pop-up booth" };
@@ -76,7 +76,6 @@ function formatDate(date, options) {
 }
 
 export default function Appointment() {
-  const { user, loading: authLoading } = useAuth();
   const { services, loading: servicesLoading, error: servicesError, reload: reloadServices } = useServices();
   const { request, submitting } = useRequestAppointment();
 
@@ -101,6 +100,10 @@ export default function Appointment() {
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [visitType, setVisitType] = useState("address");
   const [notice, setNotice] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [confirmation, setConfirmation] = useState(null); // { reference } after a successful request
 
   const service = services.find((item) => item.id === serviceId) ?? services[0] ?? null;
 
@@ -152,14 +155,6 @@ export default function Appointment() {
   };
 
   const continueRequest = async () => {
-    if (authLoading) {
-      setNotice("Checking your account. Please try again in a moment.");
-      return;
-    }
-    if (!user) {
-      setNotice("Please log in to request an appointment");
-      return;
-    }
     if (!service) {
       setNotice("Choose a piercing to continue.");
       return;
@@ -168,22 +163,35 @@ export default function Appointment() {
       setNotice("Choose an available time to continue.");
       return;
     }
+    const guestCheck = validateGuestDetails({ name: guestName, phone: guestPhone, email: guestEmail });
+    if (!guestCheck.ok) {
+      setNotice(guestCheck.message);
+      return;
+    }
 
     setNotice("");
     const result = await request({
       serviceId: service.id,
       slotId: selectedSlot.id,
+      guestName,
+      guestPhone,
+      guestEmail,
       notes: `Setting: ${SETTING_LABELS[visitType]}`,
       slotStartsAt: selectedSlot.startsAt,
     });
 
     if (result.ok) {
-      setNotice("Request sent! Your appointment is PENDING. The shop will review it and confirm with you.");
+      setConfirmation({ reference: result.reference });
       setSelectedSlotId("");
     } else {
       setNotice(result.message);
     }
     reloadSlots(); // refresh so a slot that was just taken disappears
+  };
+
+  const startAnotherRequest = () => {
+    setConfirmation(null);
+    setNotice("");
   };
 
   return (
@@ -363,6 +371,51 @@ export default function Appointment() {
                   </button>
                 </div>
               </section>
+
+              <section className="availability-step" aria-labelledby="details-step">
+                <div className="availability-step__heading">
+                  <span>05</span>
+                  <div><h3 id="details-step">Your details</h3><p>So the shop can confirm your appointment. No account needed.</p></div>
+                </div>
+                <div className="guest-form">
+                  <label>
+                    <span>Full name</span>
+                    <input
+                      autoComplete="name"
+                      maxLength={80}
+                      onChange={(e) => { setGuestName(e.target.value); setNotice(""); }}
+                      placeholder="Juan Dela Cruz"
+                      type="text"
+                      value={guestName}
+                    />
+                  </label>
+                  <label>
+                    <span>Mobile number</span>
+                    <input
+                      autoComplete="tel"
+                      inputMode="tel"
+                      maxLength={20}
+                      onChange={(e) => { setGuestPhone(e.target.value); setNotice(""); }}
+                      placeholder="0917 123 4567"
+                      type="tel"
+                      value={guestPhone}
+                    />
+                  </label>
+                  <label>
+                    <span>Email <em>(optional)</em></span>
+                    <input
+                      autoComplete="email"
+                      inputMode="email"
+                      maxLength={254}
+                      onChange={(e) => { setGuestEmail(e.target.value); setNotice(""); }}
+                      placeholder="you@example.com"
+                      type="email"
+                      value={guestEmail}
+                    />
+                  </label>
+                  <p className="guest-form__privacy">We use your name and number only to confirm and manage your appointment.</p>
+                </div>
+              </section>
             </div>
 
             <aside className="booking-summary">
@@ -374,15 +427,31 @@ export default function Appointment() {
                 <div><dt>Date</dt><dd>{formatDate(selectedDate, { month: "short", day: "numeric", year: "numeric" })}</dd></div>
                 <div><dt>Time</dt><dd>{selectedSlot ? selectedSlot.label : "Not selected"}</dd></div>
                 <div><dt>Setting</dt><dd>{SETTING_LABELS[visitType]}</dd></div>
+                <div><dt>Name</dt><dd>{guestName.trim() || "—"}</dd></div>
               </dl>
               <div className="booking-summary__message">
                 <strong>Final confirmation required</strong>
                 <p>Jewelry choice, anatomy, address suitability, travel details, and final total are reviewed before approval.</p>
               </div>
-              <button className="booking-summary__cta" type="button" disabled={submitting} aria-busy={submitting} onClick={continueRequest}>
-                {submitting ? "Sending request…" : "Continue to request"} <span>→</span>
-              </button>
-              {notice && <p className="booking-summary__notice" role="status">{notice}</p>}
+              {confirmation ? (
+                <div className="booking-confirmation" role="status">
+                  <strong>Request sent!</strong>
+                  <p>Your appointment is <b>pending</b>. The shop will review it and contact you to confirm.</p>
+                  <p className="booking-confirmation__label">Your reference code</p>
+                  <p className="booking-confirmation__code">{formatReference(confirmation.reference)}</p>
+                  <p>Take a screenshot or write it down. You will need this code and your mobile number to check or cancel your request.</p>
+                  <button className="booking-summary__cta" type="button" onClick={startAnotherRequest}>
+                    Make another request <span>→</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button className="booking-summary__cta" type="button" disabled={submitting} aria-busy={submitting} onClick={continueRequest}>
+                    {submitting ? "Sending request…" : "Send request"} <span>→</span>
+                  </button>
+                  {notice && <p className="booking-summary__notice" role="alert">{notice}</p>}
+                </>
+              )}
               <a href="https://www.instagram.com/piercetheveil.ac/" target="_blank" rel="noreferrer">Questions? Message @piercetheveil.ac</a>
             </aside>
           </div>

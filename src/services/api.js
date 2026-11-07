@@ -4,11 +4,22 @@
 export function toUserMessage(error) {
   if (!error) return "";
   const m = error.message || "";
-  if (error.code === "23505") return "You already have a request for this slot.";
+  if (error.code === "23505") return "You already have a request for this time slot.";
   if (m.includes("Slot is full")) return "Sorry, that time slot was just taken. Please pick another.";
   if (m.includes("Slot not available") || m.includes("New slot not available"))
     return "That time slot is no longer available.";
   if (m.includes("Service not available")) return "That service is not available right now.";
+  if (m.includes("Too many active bookings"))
+    return "You already have 3 upcoming requests. Please wait for the shop to confirm one, or cancel one first.";
+  if (m.includes("Too many requests right now"))
+    return "We are getting a lot of requests right now. Please try again in a few minutes.";
+  if (m.includes("Invalid phone number")) return "Please enter a valid mobile number, e.g. 0917 123 4567.";
+  if (m.includes("Please enter your name")) return "Please enter your name.";
+  if (m.includes("Invalid email address")) return "That email address does not look right.";
+  if (m.includes("Notes are too long")) return "Your notes are too long. Please shorten them.";
+  if (m.includes("Booking not found")) return "We could not find a booking with that code and phone number.";
+  if (m.includes("can no longer be cancelled"))
+    return "This appointment can no longer be cancelled online. Please message the shop.";
   if (m.includes("Admins only")) return "You do not have permission to do that.";
   if (m.includes("Invalid status change")) return "That change isn't allowed for this appointment's current status.";
   if (m.includes("Invalid login credentials")) return "Incorrect email or password.";

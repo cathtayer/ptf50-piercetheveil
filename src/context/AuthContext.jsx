@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
       profile: currentProfile,
       isAdmin: currentProfile?.role === "admin",
       loading,
-      setProfile, // call after updateProfile() so the UI refreshes
+      setProfile,
     };
   }, [session, profile, loadedFor, userId]);
 
