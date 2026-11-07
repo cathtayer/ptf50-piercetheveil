@@ -1,37 +1,49 @@
 import { useMemo, useState } from "react";
 import Footer from "../../components/client/Footer";
 import Navbar from "../../components/client/Navbar";
+import { useAuth } from "../../hooks/useAuth";
+import {
+  useAvailableSlots,
+  useRequestAppointment,
+  useServices,
+} from "../../hooks/useAppointments";
+import { formatManila } from "../../services/api";
 
-const services = [
-  { name: "Lobe", price: 100, duration: 30 },
-  { name: "Helix", price: 170, duration: 40 },
-  { name: "Conch", price: 200, duration: 40 },
-  { name: "Flat", price: 200, duration: 40 },
-  { name: "Septum", price: 400, duration: 45 },
-  { name: "Eyebrow", price: 350, duration: 45 },
-  { name: "Labret", price: 350, duration: 45 },
-  { name: "Navel", price: 450, duration: 50 },
-];
+const MANILA_OFFSET = "+08:00";
+const SETTING_LABELS = { address: "Client address", popup: "Pop-up booth" };
 
-const slotsByDay = {
-  0: ["11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"],
-  2: ["10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM"],
-  3: ["10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM"],
-  4: ["10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM"],
-  5: ["10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM", "7:00 PM"],
-  6: ["10:00 AM", "12:00 PM", "2:00 PM", "4:00 PM", "6:00 PM", "7:00 PM"],
-};
+const manilaDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Manila",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
 
-const unavailableSlots = {
-  2: ["12:00 PM"],
-  4: ["4:00 PM"],
-  6: ["2:00 PM", "6:00 PM"],
-};
+// "YYYY-MM-DD" of an instant, as seen in Asia/Manila.
+function manilaDateKey(value) {
+  const parts = manilaDateFormatter.formatToParts(new Date(value));
+  const pick = (type) => parts.find((part) => part.type === type)?.value;
+  return `${pick("year")}-${pick("month")}-${pick("day")}`;
+}
 
+// "YYYY-MM-DD" of a calendar cell. Calendar cells are plain dates, treated as Manila dates.
+function localDateKey(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function formatTimeLabel(iso) {
+  return formatManila(iso, { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+}
+
+function formatPrice(price) {
+  return `₱${Number(price).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
+}
+
+// Today's date in Manila, as a Date at 12:00 so daylight and timezone shifts never change the day.
 function getToday() {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  return today;
+  const [year, month, day] = manilaDateKey(new Date()).split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
 function getFirstAvailableDate() {
@@ -64,6 +76,10 @@ function formatDate(date, options) {
 }
 
 export default function Appointment() {
+  const { user, loading: authLoading } = useAuth();
+  const { services, loading: servicesLoading, error: servicesError, reload: reloadServices } = useServices();
+  const { request, submitting } = useRequestAppointment();
+
   const today = useMemo(getToday, []);
   const lastBookableDate = useMemo(() => {
     const date = getToday();
@@ -71,17 +87,54 @@ export default function Appointment() {
     return date;
   }, []);
   const firstAvailableDate = useMemo(getFirstAvailableDate, []);
-  const [service, setService] = useState(services[0]);
+
+  // One request covers the whole bookable window, so the calendar can show which days have open times.
+  const slotsFrom = useMemo(() => new Date(`${localDateKey(today)}T00:00:00${MANILA_OFFSET}`), [today]);
+  const slotsTo = useMemo(() => new Date(`${localDateKey(lastBookableDate)}T23:59:59${MANILA_OFFSET}`), [lastBookableDate]);
+  const { slots, loading: slotsLoading, error: slotsError, reload: reloadSlots } = useAvailableSlots(slotsFrom, slotsTo);
+
+  const [serviceId, setServiceId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(firstAvailableDate);
   const [calendarMonth, setCalendarMonth] = useState(
     new Date(firstAvailableDate.getFullYear(), firstAvailableDate.getMonth(), 1, 12),
   );
-  const [selectedTime, setSelectedTime] = useState("");
+  const [selectedSlotId, setSelectedSlotId] = useState("");
   const [visitType, setVisitType] = useState("address");
   const [notice, setNotice] = useState("");
 
-  const daySlots = slotsByDay[selectedDate.getDay()] || [];
-  const unavailable = unavailableSlots[selectedDate.getDay()] || [];
+  const service = services.find((item) => item.id === serviceId) ?? services[0] ?? null;
+
+  // Open slots grouped by Asia/Manila date, each day sorted by time.
+  const slotsByDate = useMemo(() => {
+    const map = new Map();
+    for (const slot of slots) {
+      const key = manilaDateKey(slot.starts_at);
+      const list = map.get(key) ?? [];
+      list.push({
+        id: slot.id,
+        startsAt: slot.starts_at,
+        label: formatTimeLabel(slot.starts_at),
+        remaining: Number(slot.remaining ?? 0),
+      });
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+    }
+    return map;
+  }, [slots]);
+
+  const openDays = useMemo(() => {
+    const days = new Set();
+    for (const [key, list] of slotsByDate) {
+      if (list.some((slot) => slot.remaining > 0)) days.add(key);
+    }
+    return days;
+  }, [slotsByDate]);
+  const slotsReady = !slotsLoading && !slotsError;
+
+  const daySlots = slotsByDate.get(localDateKey(selectedDate)) ?? [];
+  const selectedSlot = daySlots.find((slot) => slot.id === selectedSlotId && slot.remaining > 0) ?? null;
   const calendarDays = useMemo(() => makeCalendarDays(calendarMonth), [calendarMonth]);
   const firstCalendarMonth = new Date(today.getFullYear(), today.getMonth(), 1, 12);
   const lastCalendarMonth = new Date(lastBookableDate.getFullYear(), lastBookableDate.getMonth(), 1, 12);
@@ -90,7 +143,7 @@ export default function Appointment() {
 
   const selectDate = (date) => {
     setSelectedDate(date);
-    setSelectedTime("");
+    setSelectedSlotId("");
     setNotice("");
   };
 
@@ -98,12 +151,39 @@ export default function Appointment() {
     setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() + amount, 1, 12));
   };
 
-  const continueRequest = () => {
-    if (!selectedTime) {
+  const continueRequest = async () => {
+    if (authLoading) {
+      setNotice("Checking your account. Please try again in a moment.");
+      return;
+    }
+    if (!user) {
+      setNotice("Please log in to request an appointment");
+      return;
+    }
+    if (!service) {
+      setNotice("Choose a piercing to continue.");
+      return;
+    }
+    if (!selectedSlot) {
       setNotice("Choose an available time to continue.");
       return;
     }
-    setNotice("Your selection is ready. The request form will be enabled when the booking API is connected.");
+
+    setNotice("");
+    const result = await request({
+      serviceId: service.id,
+      slotId: selectedSlot.id,
+      notes: `Setting: ${SETTING_LABELS[visitType]}`,
+      slotStartsAt: selectedSlot.startsAt,
+    });
+
+    if (result.ok) {
+      setNotice("Request sent! Your appointment is PENDING. The shop will review it and confirm with you.");
+      setSelectedSlotId("");
+    } else {
+      setNotice(result.message);
+    }
+    reloadSlots(); // refresh so a slot that was just taken disappears
   };
 
   return (
@@ -134,7 +214,7 @@ export default function Appointment() {
               <p className="eyebrow eyebrow--dark"><span /> Check availability</p>
               <h2>Plan your <em>appointment.</em></h2>
             </div>
-            <p>Select a service, preferred date, and open time. This screen currently uses preview availability until the admin schedule API is connected.</p>
+            <p>Select a service, preferred date, and open time. Times shown are open in the shop's schedule and are requested, not guaranteed, until the shop confirms.</p>
           </div>
 
           <div className="availability-layout">
@@ -144,19 +224,28 @@ export default function Appointment() {
                   <span>01</span>
                   <div><h3 id="service-step">Choose a piercing</h3><p>Pricing is based on the current service guide.</p></div>
                 </div>
-                <div className="service-options">
-                  {services.map((item) => (
-                    <button
-                      className={service.name === item.name ? "active" : ""}
-                      key={item.name}
-                      type="button"
-                      onClick={() => { setService(item); setNotice(""); }}
-                    >
-                      <span>{item.name}</span>
-                      <small>from ₱{item.price} · {item.duration} min</small>
-                    </button>
-                  ))}
-                </div>
+                {servicesLoading && <p className="booking-summary__notice" role="status">Loading services…</p>}
+                {!servicesLoading && servicesError && (
+                  <div>
+                    <p className="booking-summary__notice" role="alert">{servicesError}</p>
+                    <button type="button" onClick={reloadServices}>Try again</button>
+                  </div>
+                )}
+                {!servicesLoading && !servicesError && (
+                  <div className="service-options">
+                    {services.map((item) => (
+                      <button
+                        className={service?.id === item.id ? "active" : ""}
+                        key={item.id}
+                        type="button"
+                        onClick={() => { setServiceId(item.id); setNotice(""); }}
+                      >
+                        <span>{item.name}</span>
+                        <small>from {formatPrice(item.price)} · {item.duration_minutes} min</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <section className="availability-step" aria-labelledby="date-step">
@@ -192,7 +281,8 @@ export default function Appointment() {
                   <div className="booking-calendar__days">
                     {calendarDays.map((date) => {
                       const outsideMonth = date.getMonth() !== calendarMonth.getMonth();
-                      const unavailableDay = date <= today || date > lastBookableDate || date.getDay() === 1 || outsideMonth;
+                      const noOpenTimes = slotsReady && !openDays.has(localDateKey(date));
+                      const unavailableDay = date <= today || date > lastBookableDate || date.getDay() === 1 || outsideMonth || noOpenTimes;
                       const active = isSameDate(date, selectedDate);
 
                       return (
@@ -228,17 +318,29 @@ export default function Appointment() {
                   </div>
                 </div>
                 <div className="time-options">
-                  {daySlots.map((time) => {
-                    const disabled = unavailable.includes(time);
+                  {slotsLoading && daySlots.length === 0 && (
+                    <p className="booking-summary__notice" role="status">Loading available times…</p>
+                  )}
+                  {!slotsLoading && slotsError && (
+                    <>
+                      <p className="booking-summary__notice" role="alert">{slotsError}</p>
+                      <button type="button" onClick={reloadSlots}>Try again</button>
+                    </>
+                  )}
+                  {slotsReady && daySlots.length === 0 && (
+                    <p className="booking-summary__notice" role="status">No open times on this date. Please pick another day.</p>
+                  )}
+                  {daySlots.map((slot) => {
+                    const disabled = slot.remaining <= 0;
                     return (
                       <button
-                        className={selectedTime === time ? "active" : ""}
+                        className={selectedSlot?.id === slot.id ? "active" : ""}
                         disabled={disabled}
-                        key={time}
+                        key={slot.id}
                         type="button"
-                        onClick={() => { setSelectedTime(time); setNotice(""); }}
+                        onClick={() => { setSelectedSlotId(slot.id); setNotice(""); }}
                       >
-                        {time}<small>{disabled ? "Taken" : "Available"}</small>
+                        {slot.label}<small>{disabled ? "Taken" : "Available"}</small>
                       </button>
                     );
                   })}
@@ -267,17 +369,19 @@ export default function Appointment() {
               <p className="booking-summary__eyebrow">Your selection</p>
               <h3>Appointment summary</h3>
               <dl>
-                <div><dt>Service</dt><dd>{service.name}</dd></div>
-                <div><dt>Starting price</dt><dd>₱{service.price}</dd></div>
+                <div><dt>Service</dt><dd>{service ? service.name : "Not selected"}</dd></div>
+                <div><dt>Starting price</dt><dd>{service ? formatPrice(service.price) : "—"}</dd></div>
                 <div><dt>Date</dt><dd>{formatDate(selectedDate, { month: "short", day: "numeric", year: "numeric" })}</dd></div>
-                <div><dt>Time</dt><dd>{selectedTime || "Not selected"}</dd></div>
-                <div><dt>Setting</dt><dd>{visitType === "address" ? "Client address" : "Pop-up booth"}</dd></div>
+                <div><dt>Time</dt><dd>{selectedSlot ? selectedSlot.label : "Not selected"}</dd></div>
+                <div><dt>Setting</dt><dd>{SETTING_LABELS[visitType]}</dd></div>
               </dl>
               <div className="booking-summary__message">
                 <strong>Final confirmation required</strong>
                 <p>Jewelry choice, anatomy, address suitability, travel details, and final total are reviewed before approval.</p>
               </div>
-              <button className="booking-summary__cta" type="button" onClick={continueRequest}>Continue to request <span>→</span></button>
+              <button className="booking-summary__cta" type="button" disabled={submitting} aria-busy={submitting} onClick={continueRequest}>
+                {submitting ? "Sending request…" : "Continue to request"} <span>→</span>
+              </button>
               {notice && <p className="booking-summary__notice" role="status">{notice}</p>}
               <a href="https://www.instagram.com/piercetheveil.ac/" target="_blank" rel="noreferrer">Questions? Message @piercetheveil.ac</a>
             </aside>

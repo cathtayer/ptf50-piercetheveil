@@ -1,0 +1,88 @@
+import { supabase } from "../../services/supabase";
+
+const BUCKET = "jewelry-images";
+
+export async function listPiercingTypes() {
+  const { data, error } = await supabase.from("piercing_types").select("id, name").order("name");
+  if (error) throw error;
+  return data;
+}
+
+// Customers automatically see only active items (RLS); admins see everything.
+export async function listJewelry({ search, material, style, maxPrice, piercingTypeId, inStockOnly } = {}) {
+  const byPlacement = Boolean(piercingTypeId);
+  let q = supabase
+    .from("jewelry")
+    .select(
+      byPlacement
+        ? "*, jewelry_compatibility!inner(piercing_type_id, approved)"
+        : "*, jewelry_compatibility(piercing_type_id, approved)"
+    )
+    .order("created_at", { ascending: false });
+
+  if (byPlacement) {
+    q = q.eq("jewelry_compatibility.piercing_type_id", piercingTypeId).eq("jewelry_compatibility.approved", true);
+  }
+  if (search?.trim()) {
+    const safe = search.trim().replace(/[,()%]/g, " ");
+    q = q.or(`name.ilike.%${safe}%,description.ilike.%${safe}%`);
+  }
+  if (material) q = q.eq("material", material);
+  if (style) q = q.eq("style", style);
+  if (maxPrice != null && maxPrice !== "") q = q.lte("price", Number(maxPrice));
+  if (inStockOnly) q = q.gt("stock", 0);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data;
+}
+
+export async function getJewelry(id) {
+  const { data, error } = await supabase
+    .from("jewelry")
+    .select("*, jewelry_compatibility(piercing_type_id, approved, piercing_types(name))")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* ---------------- admin only (RLS rejects everyone else) ---------------- */
+
+export async function createJewelry(item) {
+  const { data, error } = await supabase.from("jewelry").insert(item).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateJewelry(id, changes) {
+  const { data, error } = await supabase.from("jewelry").update(changes).eq("id", id).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// Prefer hiding over deleting so old records keep working.
+export const setJewelryActive = (id, isActive) => updateJewelry(id, { is_active: isActive });
+
+// Replace the approved placements for one item.
+export async function setCompatibility(jewelryId, piercingTypeIds) {
+  const { error: delErr } = await supabase.from("jewelry_compatibility").delete().eq("jewelry_id", jewelryId);
+  if (delErr) throw delErr;
+  if (!piercingTypeIds.length) return;
+  const rows = piercingTypeIds.map((piercing_type_id) => ({
+    jewelry_id: jewelryId,
+    piercing_type_id,
+    approved: true,
+  }));
+  const { error } = await supabase.from("jewelry_compatibility").insert(rows);
+  if (error) throw error;
+}
+
+// Returns the public URL to store in jewelry.image_url
+export async function uploadJewelryImage(file) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
