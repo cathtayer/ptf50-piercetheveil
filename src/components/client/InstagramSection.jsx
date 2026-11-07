@@ -1,5 +1,37 @@
 const instagramUrl = "https://www.instagram.com/piercetheveil.ac/";
-const instagramEmbedUrl = "https://www.instagram.com/piercetheveil.ac/embed/";
+
+const instagramPosts = [
+  {
+    src: "/gallery/price-list-ear-piercings.webp",
+    alt: "Pierce the Veil ear piercing price guide",
+    title: "Ear piercings",
+  },
+  {
+    src: "/gallery/price-list-oral-facial-body.webp",
+    alt: "Pierce the Veil oral, facial, and body piercing price guide",
+    title: "More placements",
+  },
+  {
+    src: "/gallery/dos-donts.webp",
+    alt: "Pierce the Veil appointment do's and don'ts",
+    title: "Before your visit",
+  },
+  {
+    src: "/gallery/aftercare.webp",
+    alt: "Pierce the Veil piercing aftercare guide",
+    title: "Aftercare",
+  },
+  {
+    src: "/gallery/healing-process.webp",
+    alt: "Pierce the Veil piercing healing timeline",
+    title: "Healing process",
+  },
+  {
+    src: "/gallery/reminders.webp",
+    alt: "Pierce the Veil piercing reminders",
+    title: "Reminders",
+  },
+];
 
 function InstagramIcon() {
   return (
@@ -37,20 +69,35 @@ export default function InstagramSection() {
         </a>
       </div>
 
-      <div className="instagram-feed__widget">
-        <iframe
-          src={instagramEmbedUrl}
-          title="Pierce the Veil Instagram profile and posts"
-          loading="lazy"
-          allow="encrypted-media"
-        />
-        <p className="instagram-feed__fallback">
-          Instagram not loading?{" "}
-          <a href={instagramUrl} target="_blank" rel="noreferrer">
-            View @piercetheveil.ac directly ↗
+      <div className="instagram-feed__grid" aria-label="Featured Pierce the Veil posts">
+        {instagramPosts.map((post, index) => (
+          <a
+            className="instagram-tile"
+            href={instagramUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`${post.title} — open @piercetheveil.ac on Instagram`}
+            key={post.src}
+          >
+            <img src={post.src} alt={post.alt} loading="lazy" />
+            <span className="instagram-tile__index">{String(index + 1).padStart(2, "0")}</span>
+            <span className="instagram-tile__overlay">
+              <InstagramIcon />
+              <strong>{post.title}</strong>
+              <small>View @piercetheveil.ac ↗</small>
+            </span>
           </a>
-        </p>
+        ))}
       </div>
+
+      <a
+        className="button button--light instagram-feed__mobile-cta"
+        href={instagramUrl}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open @piercetheveil.ac ↗
+      </a>
     </section>
   );
 }
